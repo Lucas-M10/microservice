@@ -1,0 +1,18 @@
+# Variables de entorno y secretos
+.env
+**/.env
+
+# Archivos temporales de Python
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Herramientas
+.vscode/
+.pytest_cache/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
