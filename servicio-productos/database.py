@@ -1,16 +1,14 @@
 import asyncpg
 from config import DATABASE_URL
 
-
 pool : asyncpg.Pool | None = None
-
 
 async def connect_db ():
     global pool
 
     if not DATABASE_URL:
         raise RuntimeError (
-            "DATABASE_URL no esta configurada"
+            "DATABASE_URL no esta conectada"
         )
     pool = await asyncpg.create_pool (DATABASE_URL, min_size=1, max_size= 5 )
     await create_table ()

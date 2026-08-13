@@ -17,3 +17,6 @@ class ProductResponse (BaseModel):
     price: float
     stock: int
     update_at: datetime
+
+class StockUpdate (BaseModel):
+    quantity: int 
