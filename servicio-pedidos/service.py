@@ -1,16 +1,68 @@
 from repository import OrderRepository
 from schemas import OrderCreate
 from config import PRODUCT_TOKEN, PRODUCT_URL, PAYMENT_TOKEN, PAYMENT_URL
-import httpx
+import httpx, logging, asyncio
+from circuit_breaker import CircuitBreaker
 
+
+logger = logging.getLogger (f"order-{__name__}")
+
+products_breaker = CircuitBreaker ()
+payment_breaker = CircuitBreaker ()
 
 class OrderService:
 
     def __init__(self, repository: OrderRepository):
         self._repository = repository
 
+    async def _request_with_retry (self, 
+        client:httpx.AsyncClient, 
+        method:str, 
+        url:str,
+        breaker:CircuitBreaker, 
+        **kwargs):
+
+        max_attempts = 3
+
+        if not breaker.can_request ():
+            logger.warning (
+                f"Se desabilito el servidor. No se realiza la peticion a {url}"
+            )
+
+            raise ValueError(
+                "Error!! Servicio temporalmente no disponible"
+            )
+
+        for attempt in range (1, max_attempts +1):
+            
+            try:
+                response = await client.request (method, url, **kwargs)
+                breaker.record_success ()
+                return response
+
+            except (httpx.ConnectError, httpx.ConnectTimeout):
+
+                logger.warning (
+                    f"Fallo en peticion HTTP. Intento={attempt}/{max_attempts}"
+                )
+
+                if attempt == max_attempts:
+
+                    logger.error (
+                        f"Se agotaron los intentos para {url}"
+                    )
+                    breaker.record_failure ()
+                    raise 
+
+                await asyncio.sleep (1)
+
     # Creamos el pedido
     async def create_order (self, order:OrderCreate):
+
+        logger.info (
+            f"Iniciando creacion de pedido con {len(order.items)} productos"
+        )
+
         processed_items = []
         total = 0.0
 
@@ -22,20 +74,30 @@ class OrderService:
                 product_id = item.product_id
                 quantity = item.quantity 
 
-                response = await client.get (
-                    f"{PRODUCT_URL}/products/{product_id}",
-                    headers={
-                        "Authorization":f"Token {PRODUCT_TOKEN}"
-                    }
-                )
+                URL = f"{PRODUCT_URL}/products/{product_id}"
+                HEADERS= {"Authorization": f"Token {PRODUCT_TOKEN}"}
+
+                response = await self._request_with_retry (
+                    client, 
+                    "GET", 
+                    URL, 
+                    products_breaker,
+                    headers=HEADERS
+                    )
 
                 if response.status_code != 200:
+                    logger.warning (
+                        f"No se pudo obtener producto id={product_id}. Status-code={response.status_code}"
+                    )
                     raise ValueError ("ERROR!! Producto no encontrado")
 
                 product = response.json ()
                 stock = product["stock"]
 
                 if quantity > stock:
+                    logger.warning (
+                        f"Stock insuficiente para producto id={product_id}, solicitado={quantity}, disponible={stock}"
+                    )
                     raise ValueError ("ERROR!! stock insuficiente")
 
                 name_product = product["name"]
@@ -76,19 +138,27 @@ class OrderService:
         # Hacemos la peticion a pagos para crear el pago 
         async with httpx.AsyncClient () as client:
 
-            payment_response = await client.post (
-                f"{PAYMENT_URL}/pagos/",
-                headers={
-                    "Authorization": f"Token {PAYMENT_TOKEN}"
-                },
-                json={
-                    "order_id":order_id,
-                    "amount":total,
-                    "method": order.method
-                }
-            )
+            URL= f"{PAYMENT_URL}/pagos/"
+            HEADERS= {"Authorization": f"Token {PAYMENT_TOKEN}"}
+            json = {
+                "order_id": order_id,
+                "amount"  : total,
+                "method"  : order.method
+            }
 
-            if payment_response.status_code != 200:
+            payment_response = await self._request_with_retry (
+                    client,
+                    "POST",
+                    URL,
+                    payment_breaker,
+                    headers=HEADERS,
+                    json=json
+                )
+
+            if payment_response.status_code != 201:
+                logger.error(
+                    f"Error procesando pago. order_id={order_id}, Status_code={payment_response.status_code}"
+                )
                 raise ValueError ("ERROR!! No se pudo procesar el pago")
 
             payment = payment_response.json ()
@@ -99,18 +169,28 @@ class OrderService:
 
                 for item in processed_items:
 
-                    #Modificamos el stock 
-                    stock_response = await client.patch (
-                        f"{PRODUCT_URL}/products/{item['product_id']}/stock",
-                        headers= {
-                            "Authorization": f"Token {PRODUCT_TOKEN}"
-                        },
-                        json={
-                            "quantity": item["quantity"]
+                    URL= f"{PRODUCT_URL}/products/{item['product_id']}/stock"
+                    HEADERS= {
+                        "Authorization": f"Token {PRODUCT_TOKEN}"
                         }
-                    )
+                    json={
+                        "quantity":item["quantity"]
+                    }
+
+                    #Modificamos el stock 
+                    stock_response = await self._request_with_retry (
+                        client, 
+                        "PATCH", 
+                        URL,
+                        products_breaker, 
+                        headers=HEADERS, 
+                        json=json)
 
                     if stock_response.status_code != 200:
+                        logger.error (
+                            f"Error actualizando stock. order_id={order_id}, product_id={item['product_id']}, status_code={stock_response.status_code}"
+                        )
+
                         raise ValueError (
                             "ERROR!! No se pudo actualizar el stock"
                         )
@@ -123,12 +203,21 @@ class OrderService:
                 )
 
             else:
+
+                logger.warning (
+                    f"Pago rechazado. order_id={order_id}"
+                )
+
                 order_status = "REJECTED"
 
                 updated_order = await self._repository.update_status (
                     order_id,
                     order_status
                 )
+
+        logger.info (
+            f"Pedido finalizado correctamente. order_id={order_id}, status={order_status}"
+        )
 
         return updated_order
 
@@ -153,13 +242,17 @@ class OrderService:
 
     async def get_products (self):
         async with httpx.AsyncClient() as client:
-
-            response = await client.get (
-                f"{PRODUCT_URL}/products/",
-                headers= {
-                    "Authorization": f"Token {PRODUCT_TOKEN}"
-                }
-            )
+            URL= f"{PRODUCT_URL}/products/"
+            HEADERS= {
+                "Authorization": f"Token {PRODUCT_TOKEN}"
+            }
+            
+            response = await self._request_with_retry (
+                client, 
+                "GET", 
+                URL,
+                products_breaker,
+                headers= HEADERS)
 
             if response.status_code != 200:
                 raise ValueError (

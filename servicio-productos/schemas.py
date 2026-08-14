@@ -16,7 +16,7 @@ class ProductResponse (BaseModel):
     description: str
     price: float
     stock: int
-    update_at: datetime
+    updated_at: datetime
 
 class StockUpdate (BaseModel):
     quantity: int 

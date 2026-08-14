@@ -3,6 +3,13 @@ from router import router as products_router
 from contextlib import asynccontextmanager
 from database import connect_db, disconnect_db
 from auth import verify_token
+
+import logging
+
+logging.basicConfig (
+    level= logging.INFO,
+    format=format="%(asctime)s | %(levelname)s | %(name)s | %(message)s "
+)
 #uvicorn main:app --reload --port 8001
 
 @asynccontextmanager
