@@ -12,7 +12,7 @@ class PaymentRepository:
             amount=row['amount'],
             status=row['status'],
             method=row['method'],
-            mesagge=row['message'],
+            message=row['message'],
             created_at=row['created_at']
         )
 

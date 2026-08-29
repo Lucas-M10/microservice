@@ -3,6 +3,7 @@ from config import DATABASE_URL
 
 pool : asyncpg.Pool | None = None
 
+# Creamos el pool de conexiones 
 async def connect_db ():
     global pool
 
@@ -14,6 +15,7 @@ async def connect_db ():
     await create_table ()
 
 
+# Creamos la tabla donde guardaremos los datos del producto 
 async def create_table ():
     async with pool.acquire () as connection:
         await connection.execute ("""
@@ -29,6 +31,7 @@ async def create_table ():
     )
     """)
 
+# Cerramos las conexiones 
 async def disconnect_db ():
     if pool:
         await pool.close ()

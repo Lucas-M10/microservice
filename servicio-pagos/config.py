@@ -9,7 +9,7 @@ DATABASE_URL = os.getenv ("DATABASE_URL", "")
 
 PORT= int (os.getenv ("PORT", "8003"))
 
-SERVICE_TOKEN = os.getenv ("PAYMENT_SERVICE_TOKEN", "")
-
-
-VALID_TOKEN ={ SERVICE_TOKEN: "orders-service" }
+PAYMENT_JWT_SECRET = os.getenv ("PAYMENT_JWT_SECRET", "")
+JWT_ALGORITHM = "HS256"
+JWT_AUDIENCE= "payment-service"
+JWT_SUBJECT = "orders-service"

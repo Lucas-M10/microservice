@@ -1,12 +1,13 @@
 from repository import OrderRepository
 from schemas import OrderCreate
-from config import PRODUCT_TOKEN, PRODUCT_URL, PAYMENT_TOKEN, PAYMENT_URL
 import httpx, logging, asyncio
 from circuit_breaker import CircuitBreaker
-
+from config import PRODUCT_URL, PAYMENT_URL, PAYMENT_JWT_SECRET, PRODUCT_JWT_SECRET, PRODUCT_AUDIENCE, PAYMENT_AUDIENCE
+from jwt_utils import generate_jwt
 
 logger = logging.getLogger (f"order-{__name__}")
 
+# vaiables que nos ayudaran a trabajar con 
 products_breaker = CircuitBreaker ()
 payment_breaker = CircuitBreaker ()
 
@@ -15,6 +16,7 @@ class OrderService:
     def __init__(self, repository: OrderRepository):
         self._repository = repository
 
+    # Funcion que se encarga de reintentar la conexion
     async def _request_with_retry (self, 
         client:httpx.AsyncClient, 
         method:str, 
@@ -52,7 +54,9 @@ class OrderService:
                         f"Se agotaron los intentos para {url}"
                     )
                     breaker.record_failure ()
-                    raise 
+                    raise ValueError (
+                        "ERROR!! No se pudo conectar con el servicio"
+                    )
 
                 await asyncio.sleep (1)
 
@@ -66,6 +70,11 @@ class OrderService:
         processed_items = []
         total = 0.0
 
+        product_token = generate_jwt (PRODUCT_JWT_SECRET, PRODUCT_AUDIENCE)
+        PRODUCT_HEADER = {
+                    "Authorization": f"Bearer {product_token}"
+                    }
+
         # Hacemos la peticion a producto para armar la orden
         async with httpx.AsyncClient () as client:
 
@@ -75,14 +84,13 @@ class OrderService:
                 quantity = item.quantity 
 
                 URL = f"{PRODUCT_URL}/products/{product_id}"
-                HEADERS= {"Authorization": f"Token {PRODUCT_TOKEN}"}
 
                 response = await self._request_with_retry (
                     client, 
                     "GET", 
                     URL, 
                     products_breaker,
-                    headers=HEADERS
+                    headers=PRODUCT_HEADER
                     )
 
                 if response.status_code != 200:
@@ -139,7 +147,11 @@ class OrderService:
         async with httpx.AsyncClient () as client:
 
             URL= f"{PAYMENT_URL}/pagos/"
-            HEADERS= {"Authorization": f"Token {PAYMENT_TOKEN}"}
+            payment_token = generate_jwt (PAYMENT_JWT_SECRET, PAYMENT_AUDIENCE)
+
+            HEADERS= {
+                "Authorization": f"Bearer {payment_token}"
+                }
             json = {
                 "order_id": order_id,
                 "amount"  : total,
@@ -170,9 +182,7 @@ class OrderService:
                 for item in processed_items:
 
                     URL= f"{PRODUCT_URL}/products/{item['product_id']}/stock"
-                    HEADERS= {
-                        "Authorization": f"Token {PRODUCT_TOKEN}"
-                        }
+
                     json={
                         "quantity":item["quantity"]
                     }
@@ -183,8 +193,8 @@ class OrderService:
                         "PATCH", 
                         URL,
                         products_breaker, 
-                        headers=HEADERS, 
-                        json=json)
+                        headers= PRODUCT_HEADER, 
+                        json= json)
 
                     if stock_response.status_code != 200:
                         logger.error (
@@ -239,12 +249,14 @@ class OrderService:
 
         return order
 
-
+    # Accedemos a todos los productos
     async def get_products (self):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient () as client:
             URL= f"{PRODUCT_URL}/products/"
+            product_token = generate_jwt (PRODUCT_JWT_SECRET, PRODUCT_AUDIENCE)
+
             HEADERS= {
-                "Authorization": f"Token {PRODUCT_TOKEN}"
+                "Authorization": f"Bearer {product_token}"
             }
             
             response = await self._request_with_retry (
@@ -256,7 +268,7 @@ class OrderService:
 
             if response.status_code != 200:
                 raise ValueError (
-                    "ERROR!! No se pudiron obtner los productos"
+                    "ERROR!! No se pudiron obtener los productos"
                 )
 
             return response.json ()

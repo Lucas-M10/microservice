@@ -1,0 +1,125 @@
+services:
+
+  productos-db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: productos_user
+      POSTGRES_PASSWORD: "12345"
+      POSTGRES_DB: productos_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - productos_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U productos_user -d productos_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  products-service:
+    build: 
+      context: ./servicio-productos
+
+    container_name: products-service
+
+    env_file:
+      - ./servicio-productos/.env
+    
+    ports:
+      - "8001:8001"
+    
+    volumes:
+      - ./servicio-productos:/app
+
+    command: uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+    
+    depends_on:
+      productos-db:
+        condition: service_healthy
+
+
+  pagos-db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: pagos_user
+      POSTGRES_PASSWORD: "12345"
+      POSTGRES_DB: pagos_db
+    
+    ports:
+      - "5435:5432"
+    volumes:
+      - pagos_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pagos_user -d pagos_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  payment-service:
+    build: 
+      context: ./servicio-pagos
+
+    container_name: payment-service
+
+    env_file:
+      - ./servicio-pagos/.env
+
+    ports:
+      - "8003:8003"
+    
+    volumes:
+      - ./servicio-pagos:/app
+
+    command: uvicorn main:app --host 0.0.0.0 --port 8003 --reload
+
+    depends_on:
+      pagos-db:
+        condition: service_healthy
+
+
+  pedidos-db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: pedidos_user
+      POSTGRES_PASSWORD: "12345"
+      POSTGRES_DB: pedidos_db
+
+    ports:
+      - "5434:5432"
+    
+    volumes:
+      - pedidos_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pedidos_user -d pedidos_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  orders-service:
+    build: 
+      context: ./servicio-pedidos
+    
+    container_name: orders-service
+
+    env_file:
+      - ./servicio-pedidos/.env
+
+    ports:
+      - "8002:8002"
+
+    volumes:
+      - ./servicio-pedidos:/app
+
+    command: uvicorn main:app --host 0.0.0.0 --port 8002 --reload
+
+    depends_on:
+      pedidos-db:
+        condition: service_healthy
+  
+volumes:
+  productos_data:
+  pagos_data:
+  pedidos_data:

@@ -6,18 +6,20 @@ from auth import verify_token
 
 import logging
 
+# Configuracion de logs 
 logging.basicConfig (
     level= logging.INFO,
-    format=format="%(asctime)s | %(levelname)s | %(name)s | %(message)s "
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s "
 )
-#uvicorn main:app --reload --port 8001
 
+# Funcion que maneja el pool de conexiones 
 @asynccontextmanager
 async def lifespan (app:FastAPI):
     await connect_db ()
     yield
     await disconnect_db ()
 
+# Creamos la api 
 app = FastAPI (title="Productos Service", 
                lifespan=lifespan,
                dependencies= [Depends(verify_token)]

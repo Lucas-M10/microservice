@@ -13,8 +13,14 @@ router = APIRouter (prefix="/orders", tags=["Orders"])
 # Accede a todos los productos disponibles 
 @router.get ("/")
 async def get_products (service: OrderService = Depends (get_service)):
-    return await service.get_products ()
+    try:
+        return await service.get_products ()
 
+    except ValueError as error:
+        raise HTTPException (
+            status_code= status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail= str(error)
+        )
 
 # Accede a todas las ordenes disponibles
 @router.get (
@@ -35,6 +41,7 @@ async def get_all (service:OrderService = Depends (get_service)):
 async def create_order (order: OrderCreate, service:OrderService = Depends (get_service)):
     try :
         return await service.create_order (order)
+    
     except ValueError as error:
         raise HTTPException (
             status_code= status.HTTP_400_BAD_REQUEST,

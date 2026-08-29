@@ -3,3 +3,4 @@ uvicorn[standard]
 pydantic
 asyncpg
 python-dotenv
+PyJWT==2.13.0

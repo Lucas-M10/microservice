@@ -3,6 +3,19 @@ from config import DATABASE_URL
 
 pool: asyncpg.Pool | None = None
 
+# Funcion donde creamos el pool de conexiones 
+async def connection_db ():
+    global pool
+
+    if not DATABASE_URL:
+        raise RuntimeError (
+            "Database is not conected"
+        )
+
+    pool = await asyncpg.create_pool (DATABASE_URL, min_size=1, max_size=5)
+    await create_table ()
+
+# Creamos las tablas que estaremos utilizando 
 async def create_table ():
     async with pool.acquire () as connection:
         await connection.execute ("""
@@ -27,17 +40,8 @@ async def create_table ():
     );
 """)
 
-async def connection_db ():
-    global pool
 
-    if not DATABASE_URL:
-        raise RuntimeError (
-            "Database is not conected"
-        )
-
-    pool = await asyncpg.create_pool (DATABASE_URL, min_size=1, max_size=5)
-    await create_table ()
-
+# Funcion que se encarga de cerrar el pool de conexiones
 async def disconnect_db ():
     if pool: 
         await pool.close ()

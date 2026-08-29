@@ -1,7 +1,8 @@
 from fastapi import Header, HTTPException, status
+import jwt
+from config import PAYMENT_JWT_SECRET, JWT_ALGORITHM, JWT_AUDIENCE, JWT_SUBJECT
 
-from config import VALID_TOKEN
-
+# Funcion que se encarga de verificar el token 
 async def verify_token (authorization:str | None = Header (default=None, alias="Authorization")):
 
     if not authorization:
@@ -12,20 +13,36 @@ async def verify_token (authorization:str | None = Header (default=None, alias="
 
     authorization = authorization.strip ()
 
-    if not authorization.startswith ("Token "):
+
+    if not authorization.startswith ("Bearer "):
         raise HTTPException (
             status_code= status.HTTP_401_UNAUTHORIZED,
             detail="ERROR!! Formato invalido"
         )
 
-    token = authorization.replace ("Token ", "").strip ()
+    token= authorization.replace ("Bearer ", "").strip ()
 
-    service_name = VALID_TOKEN.get (token, None)
+    try:
 
-    if not service_name:
-        raise HTTPException (
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="ERROR!! Token invalido"
+        payload = jwt.decode (
+            token,
+            PAYMENT_JWT_SECRET,
+            algorithms= [JWT_ALGORITHM],
+            audience=JWT_AUDIENCE
         )
 
-    return service_name
+        subject = payload.get ("sub")
+
+        if subject != JWT_SUBJECT:
+            raise HTTPException(
+                status_code= status.HTTP_401_UNAUTHORIZED,
+                detail= "ERROR!! Servicio no autorizado"
+            )
+
+        return subject
+
+    except jwt.InvalidTokenError:
+        raise HTTPException (
+            status_code= status.HTTP_401_UNAUTHORIZED,
+            detail= "ERROR!! Token invalido"
+        )

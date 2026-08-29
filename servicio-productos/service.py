@@ -21,6 +21,7 @@ class ProductService:
         return await self._repository.get_by_id (product_id)
 
 
+    # Crea el producto y luego le decimos a repository que guarde en la base de datos 
     async def create_product (self, product:ProductCreate ):
 
         product = await self._repository.create_row (
@@ -30,18 +31,12 @@ class ProductService:
             stock=product.stock
         )
 
-        if product:
-            logger.info (
+        logger.info (
                 f"Se creo el poducto de manera correcta"
             )
-            return product
+        return product
 
-        else:
-            logger.warning (
-                f""
-            )
-
-
+    # Funcion que actualiza el stock del de la base de datos 
     async def decrease_stock (self, product_id:int, quantity: int ):
 
         product = await self._repository.get_by_id (product_id)
@@ -58,7 +53,7 @@ class ProductService:
 
         stock =product.stock
 
-        if quantity> stock:
+        if quantity > stock:
 
             logger.warning (
                 f"No hay stock suficiente. stock= {stock}, cantidad solicitada= {quantity}"

@@ -18,5 +18,6 @@ class ProductResponse (BaseModel):
     stock: int
     updated_at: datetime
 
+# Estructura para actualizar el stock
 class StockUpdate (BaseModel):
-    quantity: int 
+    quantity: int = Field (ge=0)

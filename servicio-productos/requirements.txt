@@ -2,3 +2,4 @@ fastapi
 uvicorn[standard]
 python-dotenv
 asyncpg
+PyJWT==2.13.0

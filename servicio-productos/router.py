@@ -2,11 +2,13 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from service import ProductService
 from repository import ProductRepository
 from schemas import ProductResponse, ProductCreate, StockUpdate
+import database 
+import asyncpg
 
 # Creamos la app que estara vinculada a la api central 
 router = APIRouter (prefix="/products", tags=["products", ])
 
-
+# Creamos el objeto service que utilizaremos
 def get_service () -> ProductService:
     repository = ProductRepository ()
     return ProductService (repository)
@@ -40,6 +42,7 @@ async def create_product (product: ProductCreate, service: ProductService = Depe
     return await service.create_product (product)
 
 
+# Se encarga de modificar el stock del producto 
 @router.patch (
     "/{product_id}/stock",
     response_model=ProductResponse
@@ -60,3 +63,9 @@ async def decrease_stock (
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str (error)
         )
+
+        
+
+
+
+     

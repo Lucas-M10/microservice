@@ -15,7 +15,7 @@ class OrderRepository ():
 
     
     # Arma el pedido completo
-    def _to_order (self, row, items) -> OrderResponse:
+    def _to_order (self, row, items:OrderItemResponse) -> OrderResponse:
         return OrderResponse (
             order_id= row["order_id"],
             status= row["status"],
@@ -75,7 +75,7 @@ class OrderRepository ():
             WHERE order_id = $1;""",
             order_id)
 
-            return [self._to_order_item (row) for row in rows ]
+            return [self._to_order_item (row) for row in rows]
 
     
     # Mostramos todos los pedidos 

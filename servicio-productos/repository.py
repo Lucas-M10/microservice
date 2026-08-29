@@ -1,5 +1,5 @@
 from schemas import ProductResponse
-import database
+import database 
 
 #Repository trabaja con los datos 
 
@@ -56,7 +56,7 @@ class ProductRepository:
 
         return self._to_product (row) if row else None
 
-
+    # Funcion que actualiza el stock del producto 
     async def decrease_stock (self, product_id:int , quantity:int):
 
         async with database.pool.acquire () as connection:

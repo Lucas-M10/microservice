@@ -1,9 +1,10 @@
 import asyncpg 
 from config import DATABASE_URL
 
-
+#Este sera la variable que tendra el pool de conexiones
 pool: asyncpg.Pool | None = None
 
+# Funcion que establecera el pool de conexiones a nuestra base de datos 
 async def connect_db ():
     global pool
 
@@ -16,6 +17,7 @@ async def connect_db ():
     await create_table ()
 
 
+# Creamos la tabla que estaremos usando para la base de datos 
 async def create_table ():
     async with pool.acquire () as connection:
         await connection.execute ("""
@@ -32,6 +34,7 @@ async def create_table ():
     );
 """)
 
+# Funcion que desconecta el pool de conexiones 
 async def disconnect_db ():
     if pool:
         await pool.close ()
